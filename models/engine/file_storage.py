@@ -1,66 +1,48 @@
-#!/usr/bin/env python3
-from models.review import Review
-from models.base_model import BaseModel
-import json
+#!/usr/bin/python3
+""" Class BaseModel defines common attributes/methods for other classes """
+
+import uuid
+from datetime import datetime as dt
+from models import storage
 
 
-class FileStorage(object):
-    """
-        a class FileStorage that serializes instances to a JSON
-        file and deserializes JSON file to instances
-    """
-    __file_path = 'file.json'
-    __objects = {}
+class BaseModel:
+    """ Class BaseModel """
 
-    def all(self):
-        """
-            returns the dictionary __objects
-        """
+    def __init__(self, *args, **kwargs):
+        """ Initilize a new instance of BaseModel class
+        using arguments and keyword arguments """
 
-        return self.__objects
+        if kwargs and kwargs != []:
+            value = kwargs["created_at"]
+            self.id = kwargs["id"]
+            self.created_at = dt.strptime(value, '%Y-%m-%dT%H:%M:%S.%f')
+            self.updated_at = self.created_at
+        else:
+            self.id = str(uuid.uuid4())
+            self.created_at = dt.now()
+            self.updated_at = dt.now()
+            storage.new(self)
 
-    def new(self, obj):
-        """
-            sets in __objects the obj with
-            key <obj class name>.id
-        """
+    def __str__(self):
+        """ Prints string represneting the class
 
-        dic = self.__objects
-        name = obj.__class__.__name__
-        id = obj.id
-        string = "{}.{}".format(name, id)
-        dic.update({string: obj})
+        [<class name>] (<self.id>) <self.__dict__> """
+        return ("[{}] ({}) {}".format
+                (type(self).__name__, self.id, self.__dict__))
 
     def save(self):
-        """
-            serializes __objects to the
-            JSON file (path: __file_path)
-        """
+        """ Updates public instance attribute update_at
+        with current datetime"""
 
-        dic = self.__objects
-        path = self.__file_path
-        json_dict = {}
-        for key, value in dic.items():
-            json_dict[key] = value.to_dict()
-        with open(path, mode='w', encoding='utf-8') as file:
-            file.write(json.dumps(json_dict))
+        self.updated_at = dt.now()
+        storage.save()
 
-    def reload(self):
-        """
-            deserializes the JSON file to __objects
-            (only if the JSON file (__file_path) exists ;
-            otherwise, do nothing.
-            If the file doesn’t exist,
-            no exception should be raised)
-        """
+    def to_dict(self):
+        """ Returns dictionary containing all the keys/values """
 
-        path = self.__file_path
-        obj = self.__objects
-        json_dict = {}
-        try:
-            with open(path, mode='r', encoding='utf-8') as file:
-                json_dict.update(json.loads(file.read()))
-            for key, value in json_dict.items():
-                obj[key] = eval(value['__class__'])(**value)
-        except FileNotFoundError:
-            pass
+        __dict__ = dict(self.__dict__)
+        __dict__['__class__'] = type(self).__name__
+        __dict__['created_at'] = self.created_at.isoformat()
+        __dict__['updated_at'] = self.updated_at.isoformat()
+        return __dict__
