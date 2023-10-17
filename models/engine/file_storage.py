@@ -1,48 +1,61 @@
 #!/usr/bin/python3
-""" Class BaseModel defines common attributes/methods for other classes """
+""" Class FileStorage the serializes instances to a JSON file
+and deserializes JSON file to instances"""
+import json
+import os
 
-import uuid
-from datetime import datetime as dt
-from models import storage
 
+class FileStorage:
+    """ Class FileStorage """
 
-class BaseModel:
-    """ Class BaseModel """
+    __file_path = 'file.json'
+    __objects = {}
 
-    def __init__(self, *args, **kwargs):
-        """ Initilize a new instance of BaseModel class
-        using arguments and keyword arguments """
+    def all(self):
+        """ Returns the dictionary __objects """
+        return type(self).__objects
 
-        if kwargs and kwargs != []:
-            value = kwargs["created_at"]
-            self.id = kwargs["id"]
-            self.created_at = dt.strptime(value, '%Y-%m-%dT%H:%M:%S.%f')
-            self.updated_at = self.created_at
-        else:
-            self.id = str(uuid.uuid4())
-            self.created_at = dt.now()
-            self.updated_at = dt.now()
-            storage.new(self)
+    def new(self, obj):
+        """ Sets in __objects the obj with key <obj class name>.id """
 
-    def __str__(self):
-        """ Prints string represneting the class
-
-        [<class name>] (<self.id>) <self.__dict__> """
-        return ("[{}] ({}) {}".format
-                (type(self).__name__, self.id, self.__dict__))
+        FileStorage.__objects[type(obj).__name__ + "." + obj.id] = obj
 
     def save(self):
-        """ Updates public instance attribute update_at
-        with current datetime"""
+        """ Serializes __objects to the JSON file __file_path """
+        dict_obj = {}
+        for key, value in FileStorage.__objects.items():
+            dict_obj[key] = value.to_dict()
+        with open(FileStorage.__file_path, "w") as f:
+            json.dump(dict_obj, f)
 
-        self.updated_at = dt.now()
-        storage.save()
+    def reload(self):
+        """ Deserializes the JSON file to __objects if __file_path exists
+        otherwise do nothing, with no exception being reaised """
+        # if file doesnt exists it returns
+        file_name = FileStorage.__file_path
+        if (not os.path.exists(file_name)) or os.stat(file_name).st_size == 0:
+            return
+        from models.base_model import BaseModel
+        from models.amenity import Amenity
+        from models.city import City
+        from models.place import Place
+        from models.review import Review
+        from models.state import State
+        from models.user import User
 
-    def to_dict(self):
-        """ Returns dictionary containing all the keys/values """
-
-        __dict__ = dict(self.__dict__)
-        __dict__['__class__'] = type(self).__name__
-        __dict__['created_at'] = self.created_at.isoformat()
-        __dict__['updated_at'] = self.updated_at.isoformat()
-        return __dict__
+        classes = {"BaseModel": BaseModel,
+                   "Amenity": Amenity,
+                   "City": City,
+                   "Place": Place,
+                   "Review": Review,
+                   "State": State,
+                   "User": User}
+        with open(FileStorage.__file_path, "r") as f:
+            thing = json.load(f)
+        for key, value in thing.items():
+            if value['__class__'] in classes.keys():
+                value = classes[key.split(".")[0]](**value)
+                FileStorage.__objects.update({key: value})
+            else:
+                print("** class doesn't exist **")
+                FileStorage.__objects.update({key: None})
